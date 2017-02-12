@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
 # set -o xtrace # UNCOMMENT FOR DEBUG PURPOSE !
-# author: jeanluc.rakotovao@gmail.com | jean-luc.rakotovao@alterway.fr
-# example: arg1="${1:-}"
+# author: jeanluc.rakotovao@gmail.com 
 
 #{{{ USAGE
 if [[ -z "$@" ]]
   then
     echo "usage :
-    $0 <-c|-d> <-p /some/dst/path/> [-r days_of_retention]                
-    -c  create dump             
-    -d  delete dump             
-    -p  dump destination path   
+    $0 <-p /some/dst/path >                 
+    -p  dump destination path
     "
     exit 0
 fi
@@ -45,14 +42,8 @@ fi
 #}}} INIT
 
 #{{{ PARAMS
-  while getopts ":cdp:" opt; do
+  while getopts ":p:" opt; do
     case $opt in
-      c)
-        create=true
-        ;;
-      d)
-        delete=true 
-        ;;
       p)
         dump_path="$OPTARG"
         ;;
@@ -70,7 +61,7 @@ fi
 
 #{{{ LOCKFILE
   ErrLock(){
-    echo "this process is already owned by $(cat $lock_file) with $lock_file"
+    echo "this process is already owned by PID $(cat $lock_file) with $lock_file"
     exit 1
   }
   RmLock(){
