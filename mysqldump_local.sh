@@ -11,7 +11,6 @@ if [[ -z "$@" ]]
     -c  create dump             
     -d  delete dump             
     -p  dump destination path   
-    -r  days of retention       
     "
     exit 0
 fi
