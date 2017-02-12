@@ -28,6 +28,7 @@ fi
   # files 
   lock_file="/tmp/${__base}.lock"  
   
+  
   # params 
   opt=$@ 
 
@@ -45,7 +46,7 @@ fi
   while getopts ":p:" opt; do
     case $opt in
       p)
-        dump_path="$OPTARG"
+        dump_path=$(echo "$OPTARG" | sed 's/\/*$//g') # remove endline slash
         ;;
       \?)
         echo "Invalid option: $OPTARG" >&2
