@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
- set -o xtrace 
+# set -o xtrace # UNCOMMENT FOR DEBUG PURPOSE !
 # author: jeanluc.rakotovao@gmail.com | jean-luc.rakotovao@alterway.fr
 # example: arg1="${1:-}"
 
