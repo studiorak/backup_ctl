@@ -89,18 +89,18 @@ fi
 #{{{ METHODS
   MkDump(){
   # execute the dump for each table 
-  for db in $($mysql --show-warnings="false" --execute="show databases" | egrep "[:alnum:-_]" | grep -v "Database"); do 
-    mkdir -p "${dump_path}/${timestamp}/${db}" || echo "The following directory can't be created: ${dump_path}"
-    for table in $($mysql --execute="use ${db}; show tables" | egrep "[:alnum:-_]" | grep -v "Tables_in"); do
-      if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_path}/${timestamp}/dump.log" 
-        then 
-          WrLog "[SKIPPING] - dump ${db} ${table}"       
-        else 
+  for db in $($mysql --show-warnings="false" --execute="show databases" | egrep "([[:alnum:]]|[\-\_])" | egrep -v "Database"); do
+    mkdir -p "${dump_path}/${timestamp}/${db}" #|| echo "The following directory can't be created: ${dump_path}"
+    for table in $($mysql --execute="use ${db}; show tables" | egrep "([[:alnum:]]|[\-\_])" | grep -v "Tables_in"); do
+      if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_path}/${timestamp}/dump.log"
+        then
+          WrLog "[SKIPPING] - dump ${db} ${table}"
+        else
           ${mysqldump} ${db} ${table} | ${gzip} > "${dump_path}/${timestamp}/${db}/${table}"
           WrLog "Dump ${db} ${table}"
       fi
-    done  
-  done 
+    done
+  done
   }
   RollBack(){ 
     # Roll-back on exit non 0 
@@ -116,5 +116,3 @@ fi
   RmLock
   exit 0
 #}}} BODY
-
-
