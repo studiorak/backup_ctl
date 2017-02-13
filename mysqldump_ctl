@@ -47,6 +47,7 @@ fi
     case $opt in
       p)
         dump_path=$(echo "$OPTARG" | sed 's/\/*$//g') # remove endline slash
+        mkdir -p ${dump_path}
         ;;
       f)
         override_data=true
