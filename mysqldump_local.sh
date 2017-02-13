@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# set -o xtrace # UNCOMMENT FOR DEBUG PURPOSE !
+ set -o xtrace 
 # author: jeanluc.rakotovao@gmail.com 
 
 #{{{ USAGE
@@ -27,13 +27,13 @@ fi
   
   # files 
   lock_file="/tmp/${__base}.lock"  
-  
+  retry_path=false 
   
   # params 
   opt=$@ 
 
   # date 
-  timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+  timestamp=$(date +%Y-%m-%d)
 
   # bin substitution 
   mysql=$(which mysql) || (echo "[WARNING] mysql is not installed")
@@ -43,10 +43,13 @@ fi
 #}}} INIT
 
 #{{{ PARAMS
-  while getopts ":p:" opt; do
+  while getopts ":p:f" opt; do
     case $opt in
       p)
         dump_path=$(echo "$OPTARG" | sed 's/\/*$//g') # remove endline slash
+        ;;
+      f)
+        override_data=true
         ;;
       \?)
         echo "Invalid option: $OPTARG" >&2
@@ -72,21 +75,36 @@ fi
     set -o noclobber; echo "$$" > "$lock_file" 2> /dev/null || ErrLock
     set +o noclobber
   }
+  WrLog(){
+    if [ "$?" -eq "0" ]
+      then status="SUCCESS" 
+    else 
+      status=ERROR 
+    fi
+    msg=${1:-}
+    echo "$(date) - [${status}] - ${msg:-}" >> "${dump_path}/${timestamp}/dump.log"
+  }
 #}}} LOCKFILE 
 
 #{{{ METHODS
   MkDump(){
   # execute the dump for each table 
   for db in $($mysql --show-warnings="false" --execute="show databases" | egrep "[:alnum:-_]" | grep -v "Database"); do 
-    mkdir -p "${dump_path}/${timestamp}/${db}" || echo "The following directory already exists: ${dump_path}"
+    mkdir -p "${dump_path}/${timestamp}/${db}" || echo "The following directory can't be created: ${dump_path}"
     for table in $($mysql --execute="use ${db}; show tables" | egrep "[:alnum:-_]" | grep -v "Tables_in"); do
-      ${mysqldump} ${db} ${table} | ${gzip} > "${dump_path}/${timestamp}/${db}/${table}"
+      if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_path}/${timestamp}/dump.log" 
+        then 
+          WrLog "[SKIPPING] - dump ${db} ${table}"       
+        else 
+          ${mysqldump} ${db} ${table} | ${gzip} > "${dump_path}/${timestamp}/${db}/${table}"
+          WrLog "Dump ${db} ${table}"
+      fi
     done  
   done 
   }
   RollBack(){ 
     # Roll-back on exit non 0 
-    rm -rf "${dump_path}/${timestamp}"; \
+    rm -rf "${dump_path}/${timestamp}"; 
     RmLock
   }
 #}}} METHODS
@@ -98,3 +116,5 @@ fi
   RmLock
   exit 0
 #}}} BODY
+
+
