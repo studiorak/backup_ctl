@@ -89,6 +89,10 @@ fi
 
 #{{{ METHODS
   MkDump(){
+  # create set of useful files
+  mkdir -p ${dump_path}/${timestamp} 
+  touch "${dump_path}/${timestamp}/dump.log" 
+
   # execute the dump for each table 
   for db in $($mysql --show-warnings="false" --execute="show databases" | egrep "([[:alnum:]]|[\-\_])" | egrep -v "Database"); do
     mkdir -p "${dump_path}/${timestamp}/${db}" #|| echo "The following directory can't be created: ${dump_path}"
