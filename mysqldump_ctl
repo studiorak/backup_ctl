@@ -31,13 +31,22 @@ fi
   
   # params 
   opt=$@ 
+  mysql_opt=" 
+  --defaults-file=/etc/mysql/debian.cnf 
+  --default-character-set=utf8 
+  "
+  mysqldump_opt=" 
+  --defaults-file=/etc/mysql/debian.cnf * 
+  --lock-tables=0 
+  --default-character-set=utf8 
+  --max_allowed_packet=512M --force"
 
   # date 
   timestamp=$(date +%Y-%m-%d)
 
   # bin substitution 
-  mysql=$(which mysql) || (echo "[WARNING] mysql is not installed")
-  mysqldump=$(which mysqldump) || (echo "[WARNING] mysqldump is not installed")
+  mysql="$( which mysql ) ${mysql_opt}"
+  mysqldump="$( which mysqldump ) ${mysqldump_opt}"
   gzip=$(which gzip) || (echo "[WARNING] gzip is not installed")
   gunzip=$(which gunzip) || (echo "[WARNING] gunzip is not installed")
 #}}} INIT
