@@ -106,7 +106,7 @@ fi
 
   MkBackupDir(){
     # init 
-    dump_abs_path=${dump_path}/${dump_type}/${timestamp}/
+    dump_abs_path=${dump_path}/${dump_type}/${timestamp}
     dump_log_path="${dump_abs_path}/hystory.log"
 
     # create backup directory 
