@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
- set -o xtrace 
+# set -o xtrace 
 # author: jeanluc.rakotovao@gmail.com 
 
 #{{{ USAGE
 if [[ -z "$@" ]]
   then
     echo "usage :
-    $0 < -p /some/dst/path > < -t mysql|mongo > [-f]                
-    -t  database type 
+    $0 < -p /some/dst/path > [-f]                
     -p  dump destination path
     -f  force (default is retry on failure)
     "
@@ -34,7 +33,8 @@ fi
   opt=$@ 
   mysql_opt=" 
   --defaults-file=/etc/mysql/debian.cnf 
-  --default-character-set=utf8"
+  --default-character-set=utf8 
+  "
   mysqldump_opt=" 
   --defaults-file=/etc/mysql/debian.cnf * 
   --lock-tables=0 
@@ -52,11 +52,8 @@ fi
 #}}} INIT
 
 #{{{ PARAMS
-  while getopts ":p:ft:" opt; do
+  while getopts ":p:f" opt; do
     case $opt in
-      t)
-        dump_type=$OPTARG
-        ;;
       p)
         dump_path=$(echo "$OPTARG" | sed 's/\/*$//g') # remove endline slash
         mkdir -p ${dump_path}
@@ -81,16 +78,13 @@ fi
     echo "this process is already owned by PID $(cat $lock_file) with $lock_file"
     exit 1
   }
-
   RmLock(){
     rm -f $lock_file 
   }
-
   MkLock(){
     set -o noclobber; echo "$$" > "$lock_file" 2> /dev/null || ErrLock
     set +o noclobber
   }
-
   WrLog(){
     if [ "$?" -eq "0" ]
       then status="SUCCESS" 
@@ -98,68 +92,41 @@ fi
       status=ERROR 
     fi
     msg=${1:-}
-    echo "$(date) - [${status}] - ${msg:-}" >> "${dump_path}/${dump_type}/${timestamp}/hystory.log"
+    echo "$(date) - [${status}] - ${msg:-}" >> "${dump_path}/${timestamp}/dump.log"
   }
 #}}} LOCKFILE 
 
 #{{{ METHODS
-
-  MkBackupDir(){
-    # init 
-    dump_abs_path=${dump_path}/${dump_type}/${timestamp}
-    dump_log_path="${dump_abs_path}/hystory.log"
-
-    # create backup directory 
-    mkdir -p ${dump_abs_path} || echo "could not create ${dump_type}" 
-    touch "${dump_log_path}" || echo "could not create ${dump_log_path}"  
-  }
-
-  MkMysqlDump(){
-  # create backup directory 
-  MkBackupDir 
+  MkDump(){
+  # create set of useful files
+  mkdir -p ${dump_path}/${timestamp} 
+  touch "${dump_path}/${timestamp}/dump.log" 
 
   # execute the dump for each table 
-  for db in $($mysql --execute="show databases" | egrep "([[:alnum:]]|[\-\_])" | egrep -v "Database"); do
-    for table in $($mysql --execute="use ${db}; show tables" | egrep "([[:alnum:]]|[\-\_])" | grep -v "Tables_in"); do
-      # create dump directory db/table
-      mkdir -p ${dump_abs_path}/${db}/${table} || echo "Problem while creating table directory : ${table}"
-      # default is not overwrite successful dumps   
-      if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_log_path}"
+  for db in $($mysql --show-warnings="false" --execute="show databases \G;" | egrep "Database" | awk '{print $2}' ); do
+    mkdir -p "${dump_path}/${timestamp}/${db}" #|| echo "The following directory can't be created: ${dump_path}"
+    for table in $($mysql --execute="use ${db}; show tables \G;" | egrep "Table" | awk '{print $2}'); do
+      if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_path}/${timestamp}/dump.log"
         then
-          # if not [f | --force] skip and log
           WrLog "[SKIPPING] - dump ${db} ${table}"
         else
-          # overwrite existing dumps and log 
-          ${mysqldump} ${db} ${table} | ${gzip} > "${dump_abs_path}/${db}/${table}"
+          ${mysqldump} ${db} ${table} | ${gzip} > "${dump_path}/${timestamp}/${db}/${table}"
           WrLog "Dump ${db} ${table}"
       fi
     done
   done
   }
-
-  MkMongoDump(){
-    echo "Dumping MongoDb node"
-  }
-
   RollBack(){ 
     # Roll-back on exit non 0 
-    rm -rf "${dump_path}/${dump_type}/${timestamp}"; 
+    rm -rf "${dump_path}/${timestamp}"; 
     RmLock
   }
 #}}} METHODS
 
 #{{{ BODY
-  # one process permitted !
+  # only one dump process
   MkLock 
-  case "${dump_type}" in
-    mysql)
-      MkMysqlDump || RollBack
-      ;;
-    mongo)
-      MkMongoDump || RollBack
-      ;;
-  esac 
-
+  MkDump || RollBack
   RmLock
   exit 0
 #}}} BODY
