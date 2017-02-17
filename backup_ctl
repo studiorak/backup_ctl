@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
- set -o xtrace 
+set -o xtrace 
 # author: jeanluc.rakotovao@gmail.com 
 
 #{{{ USAGE
@@ -24,29 +24,17 @@ fi
   __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   __file="${__dir}/$(basename "${BASH_SOURCE[0]}")"
   __base="$(basename ${__file} .sh)"
-  __root="$(cd "$(dirname "${__dir}")" && pwd)" # <-- change this as it depends on your app
+  __root="$(cd "$(dirname "${__dir}")" && pwd)"  
   
   # files 
   lock_file="/tmp/${__base}.lock"  
   
   # params 
   opt=$@ 
-  mysql_opt=" 
-  --defaults-file=/etc/mysql/debian.cnf 
-  --default-character-set=utf8"
-
-  mysqldump_opt=" 
-  --defaults-file=/etc/mysql/debian.cnf 
-  --lock-tables=0 
-  --default-character-set=utf8 
-  --max_allowed_packet=512M --force"
 
   # date 
   timestamp=$(date +%Y-%m-%d)
 
-  # bin substitution 
-  mysql="$(which mysql) ${mysql_opt}"
-  mysqldump="$(which mysqldump) ${mysqldump_opt}"
   gzip=$(which gzip) || (echo "[WARNING] gzip is not installed")
   gunzip=$(which gunzip) || (echo "[WARNING] gunzip is not installed")
 #}}} INIT
@@ -76,14 +64,6 @@ fi
 #}}} PARAMS
 
 #{{{ LOCKFILE
-  BuildDir(){
-    # create set of useful files
-    dump_abs_path="${dump_path}/${dump_type}/${timestamp}"
-    dump_log_file="${dump_abs_path}/history.log"
-    mkdir -p ${dump_abs_path}
-    touch "${dump_log_file}"
-  }
-
   ErrLock(){
     echo "this process is already owned by PID $(cat $lock_file) with $lock_file"
     exit 1
@@ -95,6 +75,17 @@ fi
     set -o noclobber; echo "$$" > "$lock_file" 2> /dev/null || ErrLock
     set +o noclobber
   }
+#}}} LOCKFILE 
+
+#{{{ METHODS
+  BuildDir(){
+    # create set of useful files
+    dump_abs_path="${dump_path}/${dump_type}/${timestamp}"
+    dump_log_file="${dump_abs_path}/history.log"
+    mkdir -p ${dump_abs_path}
+    touch "${dump_log_file}"
+  }
+
   WrLog(){
     if [ "$?" -eq "0" ]
       then status="SUCCESS" 
@@ -104,14 +95,51 @@ fi
     msg=${1:-}
     echo "$(date) - [${status}] - ${msg:-}" >> "${dump_log_file}"
   }
-#}}} LOCKFILE 
 
-#{{{ METHODS
+  RollBack(){ 
+    # Roll-back on exit non 0 
+    rm -rf "${dump_abs_path}"; 
+    RmLock
+  }
+
   MkMongoDump(){
-    echo "do mongo dump"
+  # some useful directories
+  BuildDir
+  MONGO=$( which mongo)
+  MONGODUMP=$( which mongodump)
+
+  for db in $( echo "show dbs" | ${MONGO} --quiet | awk '{print $1}' ) ; do 
+    mkdir -p "${dump_abs_path}/${db}" 
+    for table in $( echo "show collections" | ${MONGO} ${db} --quiet | awk '{print $1}'  ) ; do
+      if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_log_file}"
+        then
+          # skip dump if exists
+          WrLog "[SKIPPING] - dump ${db} ${table}"
+        else
+          # or make dump and log status 
+          ${MONGODUMP} --db ${db} -c ${table} -o - | ${gzip} > "${dump_abs_path}/${db}/${table}"
+          WrLog "Dump ${db} ${table}"
+      fi
+    done
+  done
   }
 
   MkMysqlDump(){
+  mysql_opt="
+  --defaults-file=/etc/mysql/debian.cnf
+  --default-character-set=utf8"
+
+  mysqldump_opt="
+  --defaults-file=/etc/mysql/debian.cnf
+  --lock-tables=0
+  --default-character-set=utf8
+  --max_allowed_packet=512M
+  --force"
+
+  # bin substitution 
+  mysql="$(which mysql) ${mysql_opt}" || echo "mysql not installed"
+  mysqldump="$(which mysqldump) ${mysqldump_opt}" || echo "mysqldump not installed"
+
   # some useful directories
   BuildDir
 
@@ -133,11 +161,6 @@ fi
   done
   }
 
-  RollBack(){ 
-    # Roll-back on exit non 0 
-    rm -rf "${dump_abs_path}"; 
-    RmLock
-  }
 #}}} METHODS
 
 #{{{ BODY
@@ -154,3 +177,4 @@ fi
   RmLock
   exit 0
 #}}} BODY
+
