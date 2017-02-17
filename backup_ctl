@@ -121,10 +121,12 @@ fi
   # execute the dump for each table 
   for db in $($mysql --execute="show databases" | egrep "([[:alnum:]]|[\-\_])" | egrep -v "Database"); do
     for table in $($mysql --execute="use ${db}; show tables" | egrep "([[:alnum:]]|[\-\_])" | grep -v "Tables_in"); do
+      # create dump directory db/table
+      mkdir -p ${dump_abs_path}/${db}/${table} || echo "Problem while creating table directory : ${table}"
       # default is not overwrite successful dumps   
       if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_log_path}"
         then
-          # skip and log
+          # if not [f | --force] skip and log
           WrLog "[SKIPPING] - dump ${db} ${table}"
         else
           # overwrite existing dumps and log 
