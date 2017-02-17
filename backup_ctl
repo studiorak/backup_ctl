@@ -98,7 +98,7 @@ fi
       status=ERROR 
     fi
     msg=${1:-}
-    echo "$(date) - [${status}] - ${msg:-}" >> "${dump_log_path}"
+    echo "$(date) - [${status}] - ${msg:-}" >> "${dump_path}/${dump_type}/${timestamp}/hystory.log"
   }
 #}}} LOCKFILE 
 
