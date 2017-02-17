@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# set -o xtrace 
+ set -o xtrace 
 # author: jeanluc.rakotovao@gmail.com 
 
 #{{{ USAGE
 if [[ -z "$@" ]]
   then
     echo "usage :
-    $0 < -p /some/dst/path > [-f]                
+    $0 < -p /some/dst/path > < -t mysql|mongo > [-f]                
+    -t  database type 
     -p  dump destination path
     -f  force (default is retry on failure)
     "
@@ -33,8 +34,7 @@ fi
   opt=$@ 
   mysql_opt=" 
   --defaults-file=/etc/mysql/debian.cnf 
-  --default-character-set=utf8 
-  "
+  --default-character-set=utf8"
   mysqldump_opt=" 
   --defaults-file=/etc/mysql/debian.cnf * 
   --lock-tables=0 
@@ -52,8 +52,11 @@ fi
 #}}} INIT
 
 #{{{ PARAMS
-  while getopts ":p:f" opt; do
+  while getopts ":p:ft:" opt; do
     case $opt in
+      t)
+        type=$OPTARG
+        ;;
       p)
         dump_path=$(echo "$OPTARG" | sed 's/\/*$//g') # remove endline slash
         mkdir -p ${dump_path}
@@ -97,7 +100,7 @@ fi
 #}}} LOCKFILE 
 
 #{{{ METHODS
-  MkDump(){
+  MkMysqlDump(){
   # create set of useful files
   mkdir -p ${dump_path}/${timestamp} 
   touch "${dump_path}/${timestamp}/dump.log" 
@@ -116,9 +119,14 @@ fi
     done
   done
   }
+
+  MkMongoDump(){
+    echo "Dumping MongoDb node"
+  }
+
   RollBack(){ 
     # Roll-back on exit non 0 
-    rm -rf "${dump_path}/${timestamp}"; 
+    rm -rf "${dump_path}/${timestamp}/${type}"; 
     RmLock
   }
 #}}} METHODS
@@ -126,7 +134,15 @@ fi
 #{{{ BODY
   # only one dump process
   MkLock 
-  MkDump || RollBack
+  case "${type}" in
+    mysql)
+      MkMysqlDump || RollBack
+      ;;
+    mongo)
+      MkMongoDump || RollBack
+      ;;
+  esac 
+
   RmLock
   exit 0
 #}}} BODY
