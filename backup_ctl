@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# set -o xtrace 
+ set -o xtrace 
 # author: jeanluc.rakotovao@gmail.com 
 
 #{{{ USAGE
@@ -33,10 +33,10 @@ fi
   opt=$@ 
   mysql_opt=" 
   --defaults-file=/etc/mysql/debian.cnf 
-  --default-character-set=utf8 
-  "
+  --default-character-set=utf8"
+
   mysqldump_opt=" 
-  --defaults-file=/etc/mysql/debian.cnf * 
+  --defaults-file=/etc/mysql/debian.cnf 
   --lock-tables=0 
   --default-character-set=utf8 
   --max_allowed_packet=512M --force"
@@ -45,18 +45,20 @@ fi
   timestamp=$(date +%Y-%m-%d)
 
   # bin substitution 
-  mysql="$( which mysql ) ${mysql_opt}"
-  mysqldump="$( which mysqldump ) ${mysqldump_opt}"
+  mysql="$(which mysql) ${mysql_opt}"
+  mysqldump="$(which mysqldump) ${mysqldump_opt}"
   gzip=$(which gzip) || (echo "[WARNING] gzip is not installed")
   gunzip=$(which gunzip) || (echo "[WARNING] gunzip is not installed")
 #}}} INIT
 
 #{{{ PARAMS
-  while getopts ":p:f" opt; do
+  while getopts ":p:t:f" opt; do
     case $opt in
       p)
         dump_path=$(echo "$OPTARG" | sed 's/\/*$//g') # remove endline slash
-        mkdir -p ${dump_path}
+        ;;
+      t)
+        dump_type="$OPTARG"
         ;;
       f)
         override_data=true
@@ -74,6 +76,14 @@ fi
 #}}} PARAMS
 
 #{{{ LOCKFILE
+  BuildDir(){
+    # create set of useful files
+    dump_abs_path="${dump_path}/${dump_type}/${timestamp}"
+    dump_log_file="${dump_abs_path}/history.log"
+    mkdir -p ${dump_abs_path}
+    touch "${dump_log_file}"
+  }
+
   ErrLock(){
     echo "this process is already owned by PID $(cat $lock_file) with $lock_file"
     exit 1
@@ -92,33 +102,40 @@ fi
       status=ERROR 
     fi
     msg=${1:-}
-    echo "$(date) - [${status}] - ${msg:-}" >> "${dump_path}/${timestamp}/dump.log"
+    echo "$(date) - [${status}] - ${msg:-}" >> "${dump_log_file}"
   }
 #}}} LOCKFILE 
 
 #{{{ METHODS
-  MkDump(){
-  # create set of useful files
-  mkdir -p ${dump_path}/${timestamp} 
-  touch "${dump_path}/${timestamp}/dump.log" 
+  MkMongoDump(){
+    echo "do mongo dump"
+  }
+
+  MkMysqlDump(){
+  # some useful directories
+  BuildDir
 
   # execute the dump for each table 
-  for db in $($mysql --show-warnings="false" --execute="show databases \G;" | egrep "Database" | awk '{print $2}' ); do
-    mkdir -p "${dump_path}/${timestamp}/${db}" #|| echo "The following directory can't be created: ${dump_path}"
+  for db in $($mysql --execute="show databases \G;" | egrep "Database" | awk '{print $2}' ); do
+    mkdir -p "${dump_abs_path}/${db}" #|| echo "The following directory can't be created: ${dump_path}"
     for table in $($mysql --execute="use ${db}; show tables \G;" | egrep "Table" | awk '{print $2}'); do
-      if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_path}/${timestamp}/dump.log"
+      # if NOT FORCE overwrite dumps 
+      if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_log_file}"
         then
+          # skip !
           WrLog "[SKIPPING] - dump ${db} ${table}"
         else
-          ${mysqldump} ${db} ${table} | ${gzip} > "${dump_path}/${timestamp}/${db}/${table}"
+          # or dump !
+          ${mysqldump} ${db} ${table} | ${gzip} > "${dump_abs_path}/${db}/${table}"
           WrLog "Dump ${db} ${table}"
       fi
     done
   done
   }
+
   RollBack(){ 
     # Roll-back on exit non 0 
-    rm -rf "${dump_path}/${timestamp}"; 
+    rm -rf "${dump_abs_path}"; 
     RmLock
   }
 #}}} METHODS
@@ -126,7 +143,14 @@ fi
 #{{{ BODY
   # only one dump process
   MkLock 
-  MkDump || RollBack
+
+  case "$dump_type" in
+    mysql)
+      MkMysqlDump || RollBack ;;
+    mongo)
+      MkMongoDump || RollBack ;;
+  esac 
+
   RmLock
   exit 0
 #}}} BODY
