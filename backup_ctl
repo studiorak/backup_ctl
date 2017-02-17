@@ -127,7 +127,7 @@ fi
           WrLog "[SKIPPING] - dump ${db} ${table}"
         else
           # overwrite existing dumps and log 
-          ${mysqldump} ${db} ${table} | ${gzip} > "${dump_log_path}/${db}/${table}"
+          ${mysqldump} ${db} ${table} | ${gzip} > "${dump_abs_path}/${db}/${table}"
           WrLog "Dump ${db} ${table}"
       fi
     done
