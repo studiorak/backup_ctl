@@ -55,7 +55,7 @@ fi
   while getopts ":p:ft:" opt; do
     case $opt in
       t)
-        type=$OPTARG
+        dump_type=$OPTARG
         ;;
       p)
         dump_path=$(echo "$OPTARG" | sed 's/\/*$//g') # remove endline slash
@@ -81,13 +81,16 @@ fi
     echo "this process is already owned by PID $(cat $lock_file) with $lock_file"
     exit 1
   }
+
   RmLock(){
     rm -f $lock_file 
   }
+
   MkLock(){
     set -o noclobber; echo "$$" > "$lock_file" 2> /dev/null || ErrLock
     set +o noclobber
   }
+
   WrLog(){
     if [ "$?" -eq "0" ]
       then status="SUCCESS" 
@@ -100,20 +103,31 @@ fi
 #}}} LOCKFILE 
 
 #{{{ METHODS
+
+  MkBackupDir(){
+    # init 
+    dump_abs_path=${dump_path}/${timestamp}/${dump_type}
+    dump_log_path="${dump_abs_path}/hystory.log"
+    # create backup directory 
+    mkdir -p ${dump_abs_path} || echo "could not create ${dump_type}" 
+    touch "${dump_log_path}" || echo "could not create ${dump_log_path}"  
+  }
+
   MkMysqlDump(){
-  # create set of useful files
-  mkdir -p ${dump_path}/${timestamp} 
-  touch "${dump_path}/${timestamp}/dump.log" 
+  # create backup directory 
+  MkBackupDir 
 
   # execute the dump for each table 
-  for db in $($mysql --show-warnings="false" --execute="show databases" | egrep "([[:alnum:]]|[\-\_])" | egrep -v "Database"); do
-    mkdir -p "${dump_path}/${timestamp}/${db}" #|| echo "The following directory can't be created: ${dump_path}"
+  for db in $($mysql --execute="show databases" | egrep "([[:alnum:]]|[\-\_])" | egrep -v "Database"); do
     for table in $($mysql --execute="use ${db}; show tables" | egrep "([[:alnum:]]|[\-\_])" | grep -v "Tables_in"); do
-      if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_path}/${timestamp}/dump.log"
+      # default is not overwrite successful dumps   
+      if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_log_path}"
         then
+          # skip and log
           WrLog "[SKIPPING] - dump ${db} ${table}"
         else
-          ${mysqldump} ${db} ${table} | ${gzip} > "${dump_path}/${timestamp}/${db}/${table}"
+          # overwrite existing dumps and log 
+          ${mysqldump} ${db} ${table} | ${gzip} > "${dump_log_path}/${db}/${table}"
           WrLog "Dump ${db} ${table}"
       fi
     done
@@ -132,9 +146,9 @@ fi
 #}}} METHODS
 
 #{{{ BODY
-  # only one dump process
+  # one process permitted !
   MkLock 
-  case "${type}" in
+  case "${dump_type}" in
     mysql)
       MkMysqlDump || RollBack
       ;;
