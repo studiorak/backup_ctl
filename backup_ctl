@@ -106,8 +106,9 @@ fi
 
   MkBackupDir(){
     # init 
-    dump_abs_path=${dump_path}/${timestamp}/${dump_type}
+    dump_abs_path=${dump_path}/${dump_type}/${timestamp}/
     dump_log_path="${dump_abs_path}/hystory.log"
+
     # create backup directory 
     mkdir -p ${dump_abs_path} || echo "could not create ${dump_type}" 
     touch "${dump_log_path}" || echo "could not create ${dump_log_path}"  
@@ -140,7 +141,7 @@ fi
 
   RollBack(){ 
     # Roll-back on exit non 0 
-    rm -rf "${dump_path}/${timestamp}/${type}"; 
+    rm -rf "${dump_path}/${dump_type}/${timestamp}"; 
     RmLock
   }
 #}}} METHODS
