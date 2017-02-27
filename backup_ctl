@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-set -o xtrace 
+#set -o xtrace 
 # author: jeanluc.rakotovao@gmail.com 
 
 #{{{ USAGE
 if [[ -z "$@" ]]
   then
     echo "usage :
-    $0 < -p /some/dst/path > [-f]                
+    $0 <-p /some/dst/path> <-t type> [-f]                
     -p  dump destination path
+    -t  type : mysql, mongo, etc.
     -f  force (default is retry on failure)
     "
     exit 0
