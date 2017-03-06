@@ -119,7 +119,7 @@ fi
           WrLog "[SKIPPING] - dump ${db} ${table}"
         else
           # or make dump and log status 
-          ${MONGODUMP} -u root -p ${MONGOPASSWD}--db ${db} -c ${table} -o - | ${gzip} > "${dump_abs_path}/${db}/${table}"
+          ${MONGODUMP} -u root -p ${MONGOPASSWD} -d ${db} -c ${table} --gzip -o "${dump_abs_path}/${db}/${table}"
           WrLog "Dump ${db} ${table}"
       fi
     done
