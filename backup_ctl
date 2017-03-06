@@ -110,7 +110,7 @@ fi
   MONGODUMP=$( which mongodump)
   MONGOPASSWD=$( grep db.getSiblingDB /root/.mongorc.js | egrep -o '\"[[:alnum:]]+\"\)\;' | egrep -o [[:alnum:] )
 
-  for db in $( echo "show dbs" | ${MONGO} -u root -p ${MONGOPASSWD} --quiet | awk '{print $1}' ) ; do 
+  for db in $( echo "show dbs" | ${MONGO} --quiet | awk '{print $1}' ) ; do 
     mkdir -p "${dump_abs_path}/${db}" 
     for table in $( echo "show collections" | ${MONGO} ${db} --quiet | awk '{print $1}'  ) ; do
       if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_log_file}"
@@ -119,7 +119,7 @@ fi
           WrLog "[SKIPPING] - dump ${db} ${table}"
         else
           # or make dump and log status 
-          ${MONGODUMP} --db ${db} -c ${table} -o - | ${gzip} > "${dump_abs_path}/${db}/${table}"
+          ${MONGODUMP} -u root -p ${MONGOPASSWD}--db ${db} -c ${table} -o - | ${gzip} > "${dump_abs_path}/${db}/${table}"
           WrLog "Dump ${db} ${table}"
       fi
     done
