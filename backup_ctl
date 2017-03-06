@@ -108,8 +108,9 @@ fi
   BuildDir
   MONGO=$( which mongo)
   MONGODUMP=$( which mongodump)
+  MONGOPASSWD=$( grep db.getSiblingDB /root/.mongorc.js | egrep -o '\"[[:alnum:]]+\"\)\;' | egrep -o [[:alnum:] )
 
-  for db in $( echo "show dbs" | ${MONGO} --quiet | awk '{print $1}' ) ; do 
+  for db in $( echo "show dbs" | ${MONGO} -u root -p ${MONGOPASSWD} --quiet | awk '{print $1}' ) ; do 
     mkdir -p "${dump_abs_path}/${db}" 
     for table in $( echo "show collections" | ${MONGO} ${db} --quiet | awk '{print $1}'  ) ; do
       if [ -z "${override_data:-}" ] && egrep -R "\[SUCCESS\] - Dump ${db} ${table}$" "${dump_log_file}"
