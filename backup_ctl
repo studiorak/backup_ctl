@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#set -o xtrace 
+set -o xtrace 
 # author: jeanluc.rakotovao@gmail.com 
 
 #{{{ USAGE
@@ -119,7 +119,7 @@ fi
           WrLog "[SKIPPING] - dump ${db} ${table}"
         else
           # or make dump and log status 
-          ${MONGODUMP} -u root -p ${MONGOPASSWD} -d ${db} -c ${table} --gzip -o "${dump_abs_path}/"
+          ${MONGODUMP} -u root -p ${MONGOPASSWD} --authenticationDatabase admin -d ${db} -c ${table} --gzip -o "${dump_abs_path}/"
           WrLog "Dump ${db} ${table}"
       fi
     done
