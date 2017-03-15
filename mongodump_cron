@@ -1,0 +1,1 @@
+30 21 * * * root /usr/local/bin/backup_ctl -t mongo -p /var/backups/ 
